@@ -1,40 +1,11 @@
 #!/usr/bin/node --harmony
+'use strict';
+
 const SerialPort = require('serialport').SerialPort;
 const yargs = require('yargs/yargs');
 const readline = require('readline');
 const dump = require('buffer-hexdump');
-const connMeter = require('./operations/conn-meter');
-
-'use strict';
-
-function ctrlHandleMeterData(ctrl, data)
-{
-    const lines = (ctrl.input + data.toString()).split('\r');
-    for (var l of lines.slice(0, lines.length - 1))
-        if (ctrl.currOpr) ctrl.currOpr.onInput(ctrl.currOpr, l);
-    return Object.assign({}, ctrl, { input: lines.slice(-1) });
-}
-
-function writeMeter(line)
-{
-    ctrl.dev.write(line);
-}
-
-function writeUser(line)
-{
-    console.log(line);
-}
-
-/**
- * Routers
- */
-
-function afterConnMeter(status)
-{
-    console.log('meter connected');
-}
-
-/*---------------------------------------------------------------------------*/
+const ConnMeter = require('./operations/ConnMeter');
 
 const argv = yargs(process.argv.slice(2))
     .option({
@@ -52,48 +23,63 @@ const argv = yargs(process.argv.slice(2))
         },
     }).argv;
 
-var ctrl = {
-    dev: null,
-    input: '',
-    currOpr: null,
-};
+class Ctrl {
+    #dev;
+    #currOpr;
+    #input;
 
-/**
- * Open tty, which talks to user
- */
+    constructor() {
+        this.#input = '';
+    }
 
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: false,
-});
+    start(devname, baud, firstOpr) {
+        this.#dev = new SerialPort({
+            path: devname,
+            baudRate: baud,
+            autoOpen: false });
+        this.#dev.open(err => {
+            if (err) throw new Error(err);
+        });
+        this.#dev.on('data', data => {
+            const lines = (this.#input + data.toString()).split('\r');
+            for (var l of lines.slice(0, lines.length - 1))
+                if (this.#currOpr) this.#currOpr.onInput(l);
+            this.#input = lines.slice(-1);
+        });
 
-rl.on('line', line => {
-    if (ctrl.currOpr) ctrl.currOpr.onInput(l);
-});
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+            terminal: false,
+        });
 
-rl.once('close', () => {
-});
+        rl.on('line', line => {
+            if (this.#currOpr) this.#currOpr.onInput(l);
+        });
+        rl.once('close', () => {
+        });
 
-/**
- * Open serial port, which talks to meter
- */
+        this.#currOpr = firstOpr;
+        firstOpr.start();
+    }
 
-ctrl.dev = new SerialPort({
-    path: argv.device,
-    baudRate: argv.baud,
-    autoOpen: false,
-});
-ctrl.dev.open(err => {
-    if (err) throw new Error(err);
-});
-ctrl.dev.on('data', data => {
-    ctrl = ctrlHandleMeterData(ctrl, data);
-});
+    /**
+     * IO routines.
+     */
 
-/**
- * Start the first operation.
- */
+    writeMeter(line) {
+        this.#dev.write(line);
+    }
 
-ctrl.currOpr = connMeter(writeMeter, writeUser, afterConnMeter);
-ctrl.currOpr.start(ctrl.currOpr);
+    writeUser(line) {
+        console.log(line);
+    }
+
+    onOprEnd(name, status) {
+        console.log('connect meter:', status.code);
+        process.exit(0);
+    }
+}
+
+const ctrl = new Ctrl();
+ctrl.start(argv.device, argv.baud, new ConnMeter(ctrl));
