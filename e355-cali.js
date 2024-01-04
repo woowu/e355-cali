@@ -75,8 +75,8 @@ class Ctrl {
         console.log(line);
     }
 
-    onOprEnd(name, status) {
-        console.log('connect meter:', status.code);
+    onOprEnd(name, err) {
+        if (err) throw(err);
         process.exit(0);
     }
 }
