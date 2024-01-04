@@ -5,6 +5,7 @@ const SerialPort = require('serialport').SerialPort;
 const yargs = require('yargs/yargs');
 const readline = require('readline');
 const dump = require('buffer-hexdump');
+const MeterType = require('./operations/MeterType');
 const ConnMeter = require('./operations/ConnMeter');
 
 const argv = yargs(process.argv.slice(2))
@@ -23,10 +24,13 @@ const argv = yargs(process.argv.slice(2))
         },
     }).argv;
 
+/**
+ * The controller of the pipeline.
+ */
 class Ctrl {
-    #dev;
-    #currOpr;
-    #input;
+    #dev;       /* serial device linked to meter */
+    #currOpr;   /* current operation object in the pipeline */
+    #input;     /* unprecessed meter input */
 
     constructor() {
         this.#input = '';
@@ -42,8 +46,10 @@ class Ctrl {
         });
         this.#dev.on('data', data => {
             const lines = (this.#input + data.toString()).split('\r');
-            for (var l of lines.slice(0, lines.length - 1))
+            for (var l of lines.slice(0, lines.length - 1)) {
+                console.log('|', l);
                 if (this.#currOpr) this.#currOpr.onInput(l);
+            }
             this.#input = lines.slice(-1);
         });
 
