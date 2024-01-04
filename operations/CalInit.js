@@ -4,16 +4,18 @@
  * Issue command IMS:CAL:INT
  */
 
-const MAX_RETRIES = 2;
+const MAX_RETRIES = 3;
 const WAIT_DELAY = 3000;
 
 module.exports = class CalInit {
     #ctrl;
     #failCount = 0;
     #timer;
+    #phaseNum;
 
-    constructor(ctrl) {
+    constructor(ctrl, phaseNum) {
         this.#ctrl = ctrl;
+        this.#phaseNum = phaseNum;
     }
 
     start() {
@@ -22,10 +24,14 @@ module.exports = class CalInit {
 
     onInput(line) {
         clearTimeout(this.#timer);
-        if (line.search('SUCCESS') >= 0)
+        if (line.search('SUCCESS') >= 0) {
             this.#ctrl.onOprEnd(null, { name: 'cal-init' });
-        if (++this.#failCount == MAX_RETRIES)
+            return;
+        }
+        if (++this.#failCount == MAX_RETRIES) {
             this.#ctrl.onOprEnd(new Error('calibration init error'));
+            return;
+        }
         this.#reqInit()
     }
 
@@ -38,6 +44,6 @@ module.exports = class CalInit {
             }
             this.#reqInit();
         }, WAIT_DELAY);
-        this.#ctrl.writeMeter('IMS:CAL:INIT\r');
+        this.#ctrl.writeMeter(`IMS:CALibration:INIT ${this.#phaseNum}\r`);
     }
 };

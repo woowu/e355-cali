@@ -66,6 +66,7 @@ module.exports = class ConnMeter {
                 + ` Ver: ${components[2]}`
                 + ` Build: ${components[3]}`);
             this.#ctrl.onOprEnd(null, { name: 'conn-meter' });
+            return;
         }
         this.#reqIdn();
     }
