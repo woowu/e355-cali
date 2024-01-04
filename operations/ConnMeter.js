@@ -1,6 +1,8 @@
 'use strict';
 
 /**
+ * Issue command *IDN?
+ *
  * In development stage, my opto connection between laptop and meter is weak
  * and not always reliable because the meter box is open. That's why here I
  * designed the retry and confirming stage so that I can adjust the opto
@@ -35,8 +37,12 @@ module.exports = class ConnMeter {
         const components = line.split(',');
         if (components.length < IDN_FIELDS_MIN_NR
             || components[0] != 'LANDIS+GYR') {
-            console.log('a');
-            this.#reset();
+            if (this.#state == 'confirming')
+                this.#reset();
+            else {
+                this.#reqIdn();
+                ++this.#failCount
+            }
             return;
         }
 
@@ -59,7 +65,7 @@ module.exports = class ConnMeter {
                 + ` Product: ${components[1]}`
                 + ` Ver: ${components[2]}`
                 + ` Build: ${components[3]}`);
-            this.#ctrl.onOprEnd(null);
+            this.#ctrl.onOprEnd(null, { name: 'conn-meter' });
         }
         this.#reqIdn();
     }

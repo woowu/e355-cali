@@ -5,22 +5,28 @@ const SerialPort = require('serialport').SerialPort;
 const yargs = require('yargs/yargs');
 const readline = require('readline');
 const dump = require('buffer-hexdump');
-const MeterType = require('./operations/MeterType');
 const ConnMeter = require('./operations/ConnMeter');
+const CalInit = require('./operations/CalInit');
 
 const argv = yargs(process.argv.slice(2))
     .option({
         'd': {
             alias: 'device',
-            describe: 'receive from this serial device',
+            describe: 'device name of serial port to meter, e.g., /dev/ttyUSB0, COM2',
             type: 'string',
             demandOption: true,
         },
         'b': {
             alias: 'baud',
-            describe: 'baud rate',
+            describe: 'baud rate of meter connection',
             default: 9600,
             type: 'number',
+        },
+        'p': {
+            alias: 'phase',
+            describe: 'meter phase type',
+            choices: ['3p', '1p', '1p2e'],
+            demandOption: true,
         },
     }).argv;
 
@@ -81,9 +87,13 @@ class Ctrl {
         console.log(line);
     }
 
-    onOprEnd(name, err) {
+    onOprEnd(err, value) {
         if (err) throw(err);
-        process.exit(0);
+        if (value.name == 'conn-meter') {
+            this.#currOpr = new CalInit(this);
+            this.#currOpr.start();
+        } else if (value.name == 'cal-init')
+            process.exit(0);
     }
 }
 
