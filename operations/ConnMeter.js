@@ -72,7 +72,7 @@ module.exports = class ConnMeter {
     }
 
     #reqIdn() {
-        this.#timer = setTimeout(() => {
+        this.#timer = this.#ctrl.createTimer(() => {
             if (++this.#failCount == MAX_RETRIES) {
                 this.#ctrl.onOprEnd(new Error('cannot connect to meter'));
                 return;

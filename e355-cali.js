@@ -10,26 +10,40 @@ const PhaseCal = require('./operations/PhaseCal');
 const SimpleReqRespCmd = require('./operations/SimpleReqRespCmd');
 
 const POWER_CYCLE_DELAY = 3000;
+const DEFAULT_MTE_PORT = 6200;
 
 const argv = yargs(process.argv.slice(2))
     .option({
         'd': {
             alias: 'device',
-            describe: 'device name of serial port to meter, e.g., /dev/ttyUSB0, COM2',
+            describe: 'Device name of serial port to meter, e.g., /dev/ttyUSB0, COM2',
             type: 'string',
             demandOption: true,
         },
         'b': {
             alias: 'baud',
-            describe: 'baud rate of meter connection',
+            describe: 'Baud rate of meter connection',
             default: 9600,
+            type: 'number',
+        },
+        't': {
+            alias: 'timer-coef',
+            describe: 'a number to multiply timeout times for'
+                + ' slowing down internal clock when simulating meter'
+                + ' output from Minicom.',
+            default: 1,
             type: 'number',
         },
         'p': {
             alias: 'phase-type',
-            describe: 'meter phase type',
+            describe: 'Meter phase type',
             choices: ['3p', '1p', '1p2e'],
             demandOption: true,
+        },
+        'm': {
+            alias: 'mte',
+            describe: `Mte IP address and port in the form <ip>[:port]. When port is not present, it defaults to ${DEFAULT_MTE_PORT}`, 
+            type: 'string',
         },
     }).argv;
 
@@ -37,17 +51,20 @@ const argv = yargs(process.argv.slice(2))
  * The controller of the pipeline.
  */
 class Ctrl {
-    #dev;           /* serial device linked to meter */
-    #rl;            /* console readline interface */
-    #currOpr;       /* current operation object in the pipeline */
-    #input;         /* unprecessed meter input */
+    #dev;               /* serial device linked to meter */
+    #rl;                /* console readline interface */
+    #currOpr;           /* current operation object in the pipeline */
+    #input;             /* unprecessed meter input */
     #phases = [];
-    #phaseType;     /* 1p, 3p, 1p2e */
-    #phaseCalIndex; /* the position into the phases array, of which
-                       we will be doing the calibration */
+    #phaseType;         /* 1p, 3p, 1p2e */
+    #phaseCalIndex;     /* the position into the phases array, of which
+                           we will be doing the calibration */
     #calWaitContinue = false;
+    #mteAddr;
+    #timerCoef = 1;     /* for testing, a number used to multiply timeout
+                           times */
 
-    constructor(phaseType) {
+    constructor(phaseType, mteAddr) {
         this.#input = '';
 
         this.#phaseType = phaseType;
@@ -59,6 +76,12 @@ class Ctrl {
             this.#phases = [2, 3];
         else
             throw new Error(`unkonwn phase type: ${phaseType}`);
+
+        this.#mteAddr = mteAddr;
+    }
+
+    set timerCoef(k) {
+        this.#timerCoef = k;
     }
 
     start(devname, baud, firstOpr) {
@@ -72,7 +95,7 @@ class Ctrl {
         this.#dev.on('data', data => {
             const lines = (this.#input + data.toString()).split('\r');
             for (var l of lines.slice(0, lines.length - 1)) {
-                console.log('<-', l.trimEnd());
+                console.log('<--\t', l.trimEnd());
                 if (this.#currOpr) this.#currOpr.onInput(l);
             }
             this.#input = lines.slice(-1);
@@ -92,12 +115,16 @@ class Ctrl {
         firstOpr.start();
     }
 
+    createTimer(cb, timeout) {
+        setTimeout(cb, timeout * this.#timerCoef);
+    }
+
     /**
      * IO routines.
      */
 
     writeMeter(line) {
-        console.log('->', line.trimEnd());
+        console.log('-->\t', line.trimEnd());
         this.#dev.write(line);
     }
 
@@ -105,11 +132,13 @@ class Ctrl {
         console.log(line);
     }
 
-    prompt(message, cb) {
+    prompt(message) {
         console.log(message);
         process.stdout.write('> ');
-        this.#rl.once('line', line => {
-            cb(line);
+        return new Promise((resolve, reject) => {
+            this.#rl.once('line', line => {
+                resolve(line);
+            });
         });
     }
 
@@ -132,7 +161,9 @@ class Ctrl {
 
         if (value.name == 'cal-init') {
             this.#phaseCalIndex = 0;
-            this.#currOpr = new PhaseCal(this, this.#phases[this.#phaseCalIndex]);
+            this.#currOpr = new PhaseCal(this,
+                this.#phases[this.#phaseCalIndex],
+                this.#mteAddr);
             this.#currOpr.start();
             return;
         }
@@ -140,7 +171,9 @@ class Ctrl {
         if (value.name == 'phase-cal'
             && (this.#phaseType != '1p2e' || this.#phaseCalIndex)) {
             if (++this.#phaseCalIndex < this.#phases.length) {
-                this.#currOpr = new PhaseCal(this, this.#phases[this.#phaseCalIndex]);
+                this.#currOpr = new PhaseCal(this,
+                    this.#phases[this.#phaseCalIndex],
+                    this.#mteAddr);
                 this.#currOpr.start();
             } else {
                 this.#currOpr = new SimpleReqRespCmd(this, {
@@ -153,13 +186,16 @@ class Ctrl {
         }
 
         if (value.name == 'phase-cal' && this.#phaseType == '1p2e') {
-            this.prompt('Feed power into the E2 path and then press Enter.', () => {
-                setTimeout(() => {
-                    this.#calWaitContinue = true;
-                    this.#currOpr = new ConnMeter(this);
-                    this.#currOpr.start();
-                }, POWER_CYCLE_DELAY);
-            });
+            this.#currOpr = null;
+            this.prompt('Feed power into the E2 path and'
+                + ' then press Enter.')
+                .then(() => {
+                    setTimeout(() => {
+                        this.#calWaitContinue = true;
+                        this.#currOpr = new ConnMeter(this);
+                        this.#currOpr.start();
+                    }, POWER_CYCLE_DELAY);
+                });
             return;
         }
 
@@ -185,5 +221,15 @@ class Ctrl {
     }
 }
 
-const ctrl = new Ctrl(argv.phaseType);
+var mteAddr = null;
+if (argv.mte) {
+    const tokens = argv.mte.split(',');
+    mteAddr = {
+        host: tokens[0],
+        port: tokens.length > 1 ? parseInt(tokens[1]) : DEFAULT_MTE_PORT,
+    };
+}
+
+const ctrl = new Ctrl(argv.phaseType, mteAddr);
+ctrl.timerCoef = argv.timerCoef;
 ctrl.start(argv.device, argv.baud, new ConnMeter(ctrl));

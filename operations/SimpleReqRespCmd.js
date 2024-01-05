@@ -41,7 +41,7 @@ module.exports = class SimpleReqRespCmd {
     }
 
     #sendReq() {
-        this.#timer = setTimeout(() => {
+        this.#timer = this.#ctrl.createTimer(() => {
             if (++this.#failCount == MAX_RETRIES) {
                 this.#ctrl.onOprEnd(new Error('no response from meter'));
                 return;
