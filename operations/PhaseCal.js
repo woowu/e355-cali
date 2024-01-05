@@ -5,7 +5,7 @@
  */
 
 const MAX_RETRIES = 3;
-const WAIT_DELAY = 1000;
+const WAIT_DELAY = 3000;
 
 module.exports = class PhaseCal {
     #ctrl;
@@ -13,6 +13,7 @@ module.exports = class PhaseCal {
     #timer;
     #phase
     #realValues;
+    #waitUser = false;
 
     constructor(ctrl, phase) {
         this.#ctrl = ctrl;
@@ -27,6 +28,7 @@ module.exports = class PhaseCal {
     }
 
     onInput(line) {
+        if (this.#waitUser) return;
         clearTimeout(this.#timer);
         if (line.search('SUCCESS') >= 0) {
             this.#ctrl.onOprEnd(null, { name: 'phase-cal' });
@@ -57,7 +59,9 @@ module.exports = class PhaseCal {
         const msg = `Enter V,I,P,Q or V,I,a of L${this.#phase}.`
             + ' V=mV, I=mA, P=mW, Q=mVar, a=℃ . Seperate values with comma.'
             + ' Ex: 240000,5000,848528,848528 or 240000,5000,45.'
+        this.#waitUser = true;
         this.#ctrl.prompt(msg, input => {
+            this.#waitUser = false;
             if (input.split(',').length < 3) {
                 this.#getRealValues(cb);
                 return;

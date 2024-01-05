@@ -6,8 +6,10 @@ const yargs = require('yargs/yargs');
 const readline = require('readline');
 const dump = require('buffer-hexdump');
 const ConnMeter = require('./operations/ConnMeter');
-const CalInit = require('./operations/CalInit');
 const PhaseCal = require('./operations/PhaseCal');
+const SimpleReqRespCmd = require('./operations/SimpleReqRespCmd');
+
+const POWER_CYCLE_DELAY = 3000;
 
 const argv = yargs(process.argv.slice(2))
     .option({
@@ -35,17 +37,20 @@ const argv = yargs(process.argv.slice(2))
  * The controller of the pipeline.
  */
 class Ctrl {
-    #dev;       /* serial device linked to meter */
-    #rl;        /* console readline interface */
-    #currOpr;   /* current operation object in the pipeline */
-    #input;     /* unprecessed meter input */
+    #dev;           /* serial device linked to meter */
+    #rl;            /* console readline interface */
+    #currOpr;       /* current operation object in the pipeline */
+    #input;         /* unprecessed meter input */
     #phases = [];
+    #phaseType;     /* 1p, 3p, 1p2e */
     #phaseCalIndex; /* the position into the phases array, of which
                        we will be doing the calibration */
+    #calWaitContinue = false;
 
     constructor(phaseType) {
         this.#input = '';
 
+        this.#phaseType = phaseType;
         if (phaseType == '3p')
             this.#phases = [1, 2, 3];
         else if (phaseType == '1p')
@@ -114,21 +119,69 @@ class Ctrl {
     onOprEnd(err, value) {
         if (err) throw(err);
 
-        if (value.name == 'conn-meter') {
-            this.#currOpr = new CalInit(this, this.#phases.length);
+        if (value.name == 'conn-meter' && ! this.#calWaitContinue) {
+            this.#currOpr = new SimpleReqRespCmd(this, {
+                cmd: 'IMS:CALibration:INIT',
+                arg: this.#phases.length.toString(),
+                name: 'cal-init',
+                timeout: 5000,
+            });
             this.#currOpr.start();
-        } else if (value.name == 'cal-init') {
+            return;
+        }
+
+        if (value.name == 'cal-init') {
             this.#phaseCalIndex = 0;
             this.#currOpr = new PhaseCal(this, this.#phases[this.#phaseCalIndex]);
             this.#currOpr.start();
-        } else if (value.name == 'phase-cal') {
+            return;
+        }
+
+        if (value.name == 'phase-cal'
+            && (this.#phaseType != '1p2e' || this.#phaseCalIndex)) {
             if (++this.#phaseCalIndex < this.#phases.length) {
                 this.#currOpr = new PhaseCal(this, this.#phases[this.#phaseCalIndex]);
                 this.#currOpr.start();
-            } else
-                process.exit(0);
-        } else
+            } else {
+                this.#currOpr = new SimpleReqRespCmd(this, {
+                    cmd: 'IMS:CAL:WR',
+                    name: 'cal-wr',
+                });
+                this.#currOpr.start();
+            }
+            return;
+        }
+
+        if (value.name == 'phase-cal' && this.#phaseType == '1p2e') {
+            this.prompt('Feed power into the E2 path and then press Enter.', () => {
+                setTimeout(() => {
+                    this.#calWaitContinue = true;
+                    this.#currOpr = new ConnMeter(this);
+                    this.#currOpr.start();
+                }, POWER_CYCLE_DELAY);
+            });
+            return;
+        }
+
+        if (value.name == 'conn-meter' && this.#calWaitContinue) {
+            this.#currOpr = new SimpleReqRespCmd(this, {
+                cmd: 'IMS:CAL:Continue', 
+                name: 'cal-cont'
+            });
+            this.#currOpr.start();
+            return;
+        }
+
+        if (value.name == 'cal-cont') {
+            this.#currOpr = new PhaseCal(this, this.#phases[++this.#phaseCalIndex]);
+            this.#currOpr.start();
+            return;
+        }
+
+        if (value.name == 'cal-wr') {
+            console.log('Calibration completed. Please power cycle the meter.');
             process.exit(0);
+        }
     }
 }
 
