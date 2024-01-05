@@ -16,7 +16,7 @@ const argv = yargs(process.argv.slice(2))
     .option({
         'd': {
             alias: 'device',
-            describe: 'Device name of serial port to meter, e.g., /dev/ttyUSB0, COM2',
+            describe: 'Name of serial device connected to meter, e.g., /dev/ttyUSB0, COM2',
             type: 'string',
             demandOption: true,
         },
@@ -27,23 +27,31 @@ const argv = yargs(process.argv.slice(2))
             type: 'number',
         },
         't': {
+            alias: 'phase-type',
+            describe: 'Meter phase type',
+            choices: ['3p', '1p', '1p2e'],
+            demandOption: true,
+        },
+        'h': {
+            alias: 'host',
+            describe: 'Mte host from which to fetch the real load values.'
+                + ' When no Mte host provided, real load values are required'
+                + ' to be entered manually.',
+            type: 'string',
+        },
+       'p': {
+            alias: 'port',
+            describe: 'Mte TCP port on which the Mte service is running', 
+            type: 'number',
+            default: DEFAULT_MTE_PORT,
+        },
+        'e': {
             alias: 'timer-coef',
             describe: 'a number to multiply timeout times for'
                 + ' slowing down internal clock when simulating meter'
                 + ' output from Minicom.',
             default: 1,
             type: 'number',
-        },
-        'p': {
-            alias: 'phase-type',
-            describe: 'Meter phase type',
-            choices: ['3p', '1p', '1p2e'],
-            demandOption: true,
-        },
-        'm': {
-            alias: 'mte',
-            describe: `Mte IP address and port in the form <ip>[:port]. When port is not present, it defaults to ${DEFAULT_MTE_PORT}`, 
-            type: 'string',
         },
     }).argv;
 
@@ -222,13 +230,7 @@ class Ctrl {
 }
 
 var mteAddr = null;
-if (argv.mte) {
-    const tokens = argv.mte.split(',');
-    mteAddr = {
-        host: tokens[0],
-        port: tokens.length > 1 ? parseInt(tokens[1]) : DEFAULT_MTE_PORT,
-    };
-}
+if (argv.host) mteAddr = { host: argv.host, port: argv.port };
 
 const ctrl = new Ctrl(argv.phaseType, mteAddr);
 ctrl.timerCoef = argv.timerCoef;

@@ -95,11 +95,11 @@ module.exports = class PhaseCal {
     }
 
     async #getRealValuesFromMte() {
-        const response = await fetch(
-            `http://${this.#mteAddr.host}:${this.#mteAddr.port}`
-            + '/api/getInstantaneous');
-        if (! response.ok)
-            throw new Error(`Mte service status: ${response.status}`);
-        return response.json();
+        const apiRoot =
+            `http://${this.#mteAddr.host}:${this.#mteAddr.port}/api`
+        const resp = await fetch(`${apiRoot}/instantaneous`);
+        if (! resp.ok)
+            throw new Error(`Mte service status: ${resp.status}`);
+        return resp.json();
     }
 };
