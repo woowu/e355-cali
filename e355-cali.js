@@ -53,17 +53,23 @@ const argv = yargs(process.argv.slice(2))
             default: 1,
             type: 'number',
         },
+        'ping': {
+            describe: 'use *IDN? to ping meter before operations',
+            type: 'boolean',
+            default: true,
+        },
     }).argv;
 
 /**
  * The controller of the pipeline.
  */
 class Ctrl {
+    phases = [];
+
     #dev;               /* serial device linked to meter */
     #rl;                /* console readline interface */
     #currOpr;           /* current operation object in the pipeline */
     #input;             /* unprecessed meter input */
-    #phases = [];
     #phaseType;         /* 1p, 3p, 1p2e */
     #phaseCalIndex;     /* the position into the phases array, of which
                            we will be doing the calibration */
@@ -77,11 +83,11 @@ class Ctrl {
 
         this.#phaseType = phaseType;
         if (phaseType == '3p')
-            this.#phases = [1, 2, 3];
+            this.phases = [1, 2, 3];
         else if (phaseType == '1p')
-            this.#phases = [1];
+            this.phases = [1];
         else if (phaseType == '1p2e')
-            this.#phases = [2, 3];
+            this.phases = [2, 3];
         else
             throw new Error(`unkonwn phase type: ${phaseType}`);
 
@@ -159,7 +165,7 @@ class Ctrl {
         if (value.name == 'conn-meter' && ! this.#calWaitContinue) {
             this.#currOpr = new SimpleReqRespCmd(this, {
                 cmd: 'IMS:CALibration:INIT',
-                arg: this.#phases.length.toString(),
+                arg: this.phases.length.toString(),
                 name: 'cal-init',
                 timeout: 5000,
             });
@@ -170,7 +176,7 @@ class Ctrl {
         if (value.name == 'cal-init') {
             this.#phaseCalIndex = 0;
             this.#currOpr = new PhaseCal(this,
-                this.#phases[this.#phaseCalIndex],
+                this.phases[this.#phaseCalIndex],
                 this.#mteAddr);
             this.#currOpr.start();
             return;
@@ -178,9 +184,9 @@ class Ctrl {
 
         if (value.name == 'phase-cal'
             && (this.#phaseType != '1p2e' || this.#phaseCalIndex)) {
-            if (++this.#phaseCalIndex < this.#phases.length) {
+            if (++this.#phaseCalIndex < this.phases.length) {
                 this.#currOpr = new PhaseCal(this,
-                    this.#phases[this.#phaseCalIndex],
+                    this.phases[this.#phaseCalIndex],
                     this.#mteAddr);
                 this.#currOpr.start();
             } else {
@@ -217,7 +223,7 @@ class Ctrl {
         }
 
         if (value.name == 'cal-cont') {
-            this.#currOpr = new PhaseCal(this, this.#phases[++this.#phaseCalIndex]);
+            this.#currOpr = new PhaseCal(this, this.phases[++this.#phaseCalIndex]);
             this.#currOpr.start();
             return;
         }
@@ -234,4 +240,16 @@ if (argv.host) mteAddr = { host: argv.host, port: argv.port };
 
 const ctrl = new Ctrl(argv.phaseType, mteAddr);
 ctrl.timerCoef = argv.timerCoef;
-ctrl.start(argv.device, argv.baud, new ConnMeter(ctrl));
+
+var firstOpr;
+if (! argv.ping)
+    firstOpr = new SimpleReqRespCmd(ctrl, {
+        cmd: 'IMS:CALibration:INIT',
+        arg: ctrl.phases.length.toString(),
+        name: 'cal-init',
+        timeout: 5000,
+    })
+else
+    firstOpr = new ConnMeter(ctrl);
+
+ctrl.start(argv.device, argv.baud, firstOpr);

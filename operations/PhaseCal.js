@@ -7,6 +7,14 @@
 const MAX_RETRIES = 3;
 const WAIT_DELAY = 3000;
 
+/**
+ * @param n convert number to an integer y in y x 10^(n)
+ */
+function int4e1ToInt(x, n)
+{
+    return parseInt(x[0] * Math.pow(10, x[1] - n));
+}
+
 module.exports = class PhaseCal {
     #ctrl;
     #failCount = 0;
@@ -98,8 +106,13 @@ module.exports = class PhaseCal {
         const apiRoot =
             `http://${this.#mteAddr.host}:${this.#mteAddr.port}/api`
         const resp = await fetch(`${apiRoot}/instantaneous`);
-        if (! resp.ok)
-            throw new Error(`Mte service status: ${resp.status}`);
-        return resp.json();
+        if (! resp.ok) throw new Error(`Mte service status: ${resp.status}`);
+        const instant = await resp.json();
+        return {
+            v: int4e1ToInt(instant.v[this.#phase - 1], -3),
+            i: int4e1ToInt(instant.i[this.#phase - 1], -3),
+            p: int4e1ToInt(instant.p[this.#phase - 1], -3),
+            q: int4e1ToInt(instant.q[this.#phase - 1], -3),
+        };
     }
 };
