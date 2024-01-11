@@ -191,6 +191,17 @@ class Ctrl {
     onOprEnd(err, value) {
         if (err) throw(err);
 
+        if (value.name == 'setup-load') {
+            console.log(`wait ${LOAD_STABLE_WAIT/1000} sec`
+                + ' for load stablizing');
+            setTimeout(() => {
+                this.#calWaitContinue = false;
+                this.#currOpr = new ConnMeter(ctrl, ! argv.ping);
+                this.#currOpr.start();
+            }, LOAD_STABLE_WAIT);
+            return;
+        }
+
         if (value.name == 'conn-meter' && ! this.#calWaitContinue) {
             this.#currOpr = new SimpleReqRespCmd(this, {
                 cmd: 'IMS:CALibration:INIT',
@@ -203,23 +214,13 @@ class Ctrl {
         }
 
         if (value.name == 'cal-init') {
-            this.#currOpr = new SetupLoad(this, this.#loadDef);
+            this.#phaseCalIndex = 0;
+            this.#currOpr = new PhaseCal(this, {
+                phase: this.phases[this.#phaseCalIndex],
+                useMte: this.#mteAddr != null,
+                wait: ! argv.yes,
+            });
             this.#currOpr.start();
-            return;
-        }
-
-        if (value.name == 'setup-load') {
-            console.log(`wait ${LOAD_STABLE_WAIT/1000} sec`
-                + ' for load stablizing');
-            setTimeout(() => {
-                this.#phaseCalIndex = 0;
-                this.#currOpr = new PhaseCal(this, {
-                    phase: this.phases[this.#phaseCalIndex],
-                    useMte: this.#mteAddr != null,
-                    wait: ! argv.yes,
-                });
-                this.#currOpr.start();
-            }, LOAD_STABLE_WAIT);
             return;
         }
 
@@ -311,4 +312,10 @@ if (argv.load) {
 const ctrl = new Ctrl(argv.phaseType, mteAddr, loadDef);
 ctrl.timerCoef = argv.timerCoef;
 
-ctrl.start(argv.device, argv.baud, new ConnMeter(ctrl, ! argv.ping));
+var firstOpr;
+if (argv.load)
+    firstOpr = new SetupLoad(ctrl, loadDef);
+else
+    firstOpr = new ConnMeter(ctrl, ! argv.ping);
+
+ctrl.start(argv.device, argv.baud, firstOpr);

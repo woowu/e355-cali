@@ -1,4 +1,7 @@
+const fetch = require('cross-fetch');
 'use strict';
+
+const math = require('mathjs');
 
 /**
  * Issue command IMS:CAL:L<n>
@@ -49,7 +52,7 @@ module.exports = class PhaseCal {
     async #reqCalibration() {
         if (this.#wait)
             await this.#ctrl.prompt(
-                `calibratre L${this.#phase}. Press enter to continue`);
+                `calibrate L${this.#phase}. Press enter to continue`);
 
         this.#ctrl.writeUser(`calibration phase ${this.#phase}`);
         this.#timer = this.#ctrl.createTimer(() => {
@@ -100,15 +103,54 @@ module.exports = class PhaseCal {
         return { v, i, p, q };
     }
 
-    async #getRealValuesFromMte() {
+    async #delay(n) {
+        new Promise((resolve, reject) => {
+            setTimeout(resolve, n);
+        });
+    }
+
+    async #fetchInstantaneous() {
         const resp = await fetch(`${this.#ctrl.getApiRoot()}/instantaneous`);
-        if (! resp.ok) throw new Error(`Mte service status: ${resp.status}`);
-        const instant = await resp.json();
+        if (resp.ok) {
+            const instant = await resp.json()
+            return {
+                error: null,
+                data: [
+                    instant.v[this.#phase - 1],
+                    instant.i[this.#phase - 1],
+                    instant.p[this.#phase - 1],
+                    instant.q[this.#phase - 1],
+                ],
+            };
+        } else
+            return { error: new Error(`Mte service status: ${resp.status}`) };
+    }
+
+    async #getRealValuesFromMte() {
+        var errors = 0;
+        const samples = [];
+        while (errors < 2) {
+            const { error, data } = await this.#fetchInstantaneous();
+            if (error) {
+                console.log(error.message);
+                ++errors;
+                await this.#delay(3000);
+            } else {
+                errors = 0;
+                console.log('got MTE reading, (v,i,p,q) ='
+                    + ` (${data[0]}, ${data[1]}, ${data[2]}, ${data[3]})`);
+                samples.push(data);
+                if (samples.length == 3) break; // TODO
+                await this.#delay(1000);
+            }
+        }
+
+        const data = samples.slice(-1)[0]; //math.mean(samples, 0);
         return {
-            v: Math.round(instant.v[this.#phase - 1]),
-            i: Math.round(instant.i[this.#phase - 1]),
-            p: Math.round(instant.p[this.#phase - 1]),
-            q: Math.round(instant.q[this.#phase - 1]),
+            v: Math.round(data[0]),
+            i: Math.round(data[0]),
+            p: Math.round(data[0]),
+            q: Math.round(data[0]),
         };
     }
 };
