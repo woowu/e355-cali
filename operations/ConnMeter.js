@@ -45,6 +45,7 @@ module.exports = class ConnMeter {
         const components = line.split(',');
         if (components.length < IDN_FIELDS_MIN_NR
             || components[0] != 'LANDIS+GYR') {
+            console.log('not a LANDIS+GYR device: ', components);
             if (this.#state == 'confirming')
                 this.#reset();
             else {
