@@ -14,6 +14,7 @@ const POWER_CYCLE_DELAY = 3000;
 const DEFAULT_MTE_PORT = 6200;
 const LINES_NUM = 3;
 const DEFAULT_FREQ = 50e3;
+const LOAD_STABLE_WAIT = 3000;
 
 const argv = yargs(process.argv.slice(2))
     .option({
@@ -53,11 +54,16 @@ const argv = yargs(process.argv.slice(2))
             describe: 'Specify the load paramters for one line',
             type: 'string',
         },
-        'f': {
+        'z': {
             alias: 'freq',
             describe: 'Network frequency',
             type: 'number',
             default: DEFAULT_FREQ,
+        },
+        'y': {
+            alias: 'yes',
+            describe: 'skip the questionaire for preparing meter before calibrating each phase',
+            type: 'boolean',
         },
         'e': {
             alias: 'timer-coef',
@@ -203,20 +209,27 @@ class Ctrl {
         }
 
         if (value.name == 'setup-load') {
-            this.#phaseCalIndex = 0;
-            this.#currOpr = new PhaseCal(this,
-                this.phases[this.#phaseCalIndex],
-                this.#mteAddr != null);
-            this.#currOpr.start();
+            console.log(`wait ${LOAD_STABLE_WAIT/1000} sec`
+                + ' for load stablizing');
+            setTimeout(() => {
+                this.#phaseCalIndex = 0;
+                this.#currOpr = new PhaseCal(this, {
+                    phase: this.phases[this.#phaseCalIndex],
+                    useMte: this.#mteAddr != null,
+                    wait: ! argv.yes,
+                });
+                this.#currOpr.start();
+            }, LOAD_STABLE_WAIT);
             return;
         }
 
-        if (value.name == 'phase-cal'
-            && (this.#phaseType != '1p2e' || this.#phaseCalIndex)) {
+        if (value.name == 'phase-cal') {
             if (++this.#phaseCalIndex < this.phases.length) {
-                this.#currOpr = new PhaseCal(this,
-                    this.phases[this.#phaseCalIndex],
-                    this.#mteAddr != null);
+                this.#currOpr = new PhaseCal(this, {
+                    phase: this.phases[this.#phaseCalIndex],
+                    useMte: this.#mteAddr != null,
+                    wait: ! argv.yes,
+                });
                 this.#currOpr.start();
             } else {
                 this.#currOpr = new SimpleReqRespCmd(this, {
@@ -225,20 +238,6 @@ class Ctrl {
                 });
                 this.#currOpr.start();
             }
-            return;
-        }
-
-        if (value.name == 'phase-cal' && this.#phaseType == '1p2e') {
-            this.#currOpr = null;
-            this.prompt('Feed power into the E2 path and'
-                + ' then press Enter.')
-                .then(() => {
-                    setTimeout(() => {
-                        this.#calWaitContinue = true;
-                        this.#currOpr = new ConnMeter(this, ! argv.ping);
-                        this.#currOpr.start();
-                    }, POWER_CYCLE_DELAY);
-                });
             return;
         }
 

@@ -15,11 +15,13 @@ module.exports = class PhaseCal {
     #realValues;
     #discardInput = false;
     #useMte;
+    #wait;
 
-    constructor(ctrl, phase, useMte = false) {
+    constructor(ctrl, { phase, useMte = false, wait = true }) {
         this.#ctrl = ctrl;
         this.#phase = phase;
         this.#useMte = useMte;
+        this.#wait = wait;
     }
 
     start() {
@@ -44,7 +46,11 @@ module.exports = class PhaseCal {
         this.#reqCalibration()
     }
 
-    #reqCalibration() {
+    async #reqCalibration() {
+        if (this.#wait)
+            await this.#ctrl.prompt(
+                `calibratre L${this.#phase}. Press enter to continue`);
+
         this.#ctrl.writeUser(`calibration phase ${this.#phase}`);
         this.#timer = this.#ctrl.createTimer(() => {
             if (++this.#failCount == MAX_RETRIES) {
