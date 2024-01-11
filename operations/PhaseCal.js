@@ -52,7 +52,6 @@ module.exports = class PhaseCal {
             await this.#ctrl.prompt(
                 `calibrate L${this.#phase}. Press enter to continue`);
 
-        this.#ctrl.writeUser(`calibration phase ${this.#phase}`);
         this.#timer = this.#ctrl.createTimer(() => {
             if (++this.#failCount == MAX_RETRIES) {
                 this.#ctrl.onOprEnd(new Error(`calibration phase ${this.#phase}`));
@@ -146,9 +145,9 @@ module.exports = class PhaseCal {
         const data = samples.slice(-1)[0]; //math.mean(samples, 0);
         return {
             v: Math.round(data[0]),
-            i: Math.round(data[0]),
-            p: Math.round(data[0]),
-            q: Math.round(data[0]),
+            i: Math.round(data[1]),
+            p: Math.round(data[2]),
+            q: Math.round(data[3]),
         };
     }
 };

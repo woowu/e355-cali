@@ -50,7 +50,6 @@ module.exports = class SetupLoad {
         clearTimeout(this.#timer);
         if (data && data.result == 'success') {
             console.log('setup load succeeded');
-            console.log('  ' + JSON.stringify(this.#loadDef));
             this.#ctrl.onOprEnd(null, { name: 'setup-load' });
         } else
             setImmediate(() => this.#setupLoad());

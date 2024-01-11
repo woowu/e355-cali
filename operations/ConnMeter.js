@@ -23,6 +23,7 @@ module.exports = class ConnMeter {
     #state = 'wait-resp';   /* 1. wait-resp, 2. confirming */
     #meterIdnRaw;
     #emptyOpr;
+    #id;
 
     constructor(ctrl, emptyOpr=false) {
         this.#ctrl = ctrl;

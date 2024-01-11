@@ -152,7 +152,7 @@ class Ctrl {
     }
 
     createTimer(cb, timeout) {
-        setTimeout(cb, timeout * this.#timerCoef);
+        return setTimeout(cb, timeout * this.#timerCoef);
     }
 
     getApiRoot() {
@@ -231,14 +231,13 @@ class Ctrl {
                     useMte: this.#mteAddr != null,
                     wait: ! argv.yes,
                 });
-                this.#currOpr.start();
             } else {
                 this.#currOpr = new SimpleReqRespCmd(this, {
                     cmd: 'IMS:CAL:WR',
                     name: 'cal-wr',
                 });
-                this.#currOpr.start();
             }
+            this.#currOpr.start();
             return;
         }
 
@@ -283,7 +282,6 @@ function parseLoadDef(spec)
             throw new Error('incorrect line name: ' + line);
         if (lineSpec == '' || lineSpec === undefined)
             throw new Error('spec missed for line ' + line);
-        console.log(lineSpec);
         for (const item of lineSpec.split(',')) {
             const [name, value] = item.split('=');
             if (value == '' || value === undefined)
