@@ -93,7 +93,6 @@ class Ctrl {
     #phaseType;         /* 1p, 3p, 1p2e */
     #phaseCalIndex;     /* the position into the phases array, of which
                            we will be doing the calibration */
-    #calWaitContinue = false;
     #mteAddr;
     #loadDef;
     #timerCoef = 1;     /* for testing, a number used to multiply timeout
@@ -147,8 +146,7 @@ class Ctrl {
             process.exit(0);
         });
 
-        this.#currOpr = firstOpr;
-        firstOpr.start();
+        this.#startOperation(firstOpr);
     }
 
     createTimer(cb, timeout) {
@@ -188,71 +186,76 @@ class Ctrl {
     /**
      * Router: determine the next operation after the previous one returns.
      */
-    onOprEnd(err, value) {
+    async onOprEnd(err, value) {
         if (err) throw(err);
 
         if (value.name == 'setup-load') {
             console.log(`wait ${LOAD_STABLE_WAIT/1000} sec`
                 + ' for load stablizing');
             setTimeout(() => {
-                this.#calWaitContinue = false;
-                this.#currOpr = new ConnMeter(ctrl, ! argv.ping);
-                this.#currOpr.start();
+                this.#startOperation(new ConnMeter(ctrl, ! argv.ping));
             }, LOAD_STABLE_WAIT);
             return;
         }
 
-        if (value.name == 'conn-meter' && ! this.#calWaitContinue) {
-            this.#currOpr = new SimpleReqRespCmd(this, {
+        if (value.name == 'conn-meter') {
+            this.#startOperation(new SimpleReqRespCmd(this, {
                 cmd: 'IMS:CALibration:INIT',
                 arg: this.phases.length.toString(),
                 name: 'cal-init',
                 timeout: 5000,
-            });
-            this.#currOpr.start();
+            }));
             return;
         }
 
         if (value.name == 'cal-init') {
             this.#phaseCalIndex = 0;
-            this.#currOpr = new PhaseCal(this, {
+            this.#startOperation(new PhaseCal(this, {
                 phase: this.phases[this.#phaseCalIndex],
                 useMte: this.#mteAddr != null,
                 wait: ! argv.yes,
-            });
-            this.#currOpr.start();
+            }));
             return;
         }
 
         if (value.name == 'phase-cal') {
-            if (++this.#phaseCalIndex < this.phases.length) {
-                this.#currOpr = new PhaseCal(this, {
+            ++this.#phaseCalIndex;
+            if (this.#phaseCalIndex == this.phases.length) {
+                this.#startOperation(new SimpleReqRespCmd(this, {
+                    cmd: 'IMS:CAL:WR',
+                    name: 'cal-wr',
+                }));
+                return;
+            }
+
+            /* Before start the 2nd phase of 1p2e meter, the meter must
+             * has been powered cycle, hence we need to run IMS:CAL:Continue
+             * command to resume the calibration process inside the meter
+             */
+            if (this.#phaseType == '1p2e' && this.#phaseCalIndex == 1) {
+                await this.prompt(
+                    'Switch power supply to element 2 and press enter.');
+                this.#startOperation(new SimpleReqRespCmd(this, {
+                    cmd: 'IMS:CAL:Continue', 
+                    name: 'cal-cont',
+                    /* wait some more time since meter's just powered up */
+                    maxRetries: 5,
+                }));
+            } else
+                this.#startOperation(new PhaseCal(this, {
                     phase: this.phases[this.#phaseCalIndex],
                     useMte: this.#mteAddr != null,
                     wait: ! argv.yes,
-                });
-            } else {
-                this.#currOpr = new SimpleReqRespCmd(this, {
-                    cmd: 'IMS:CAL:WR',
-                    name: 'cal-wr',
-                });
-            }
-            this.#currOpr.start();
-            return;
-        }
-
-        if (value.name == 'conn-meter' && this.#calWaitContinue) {
-            this.#currOpr = new SimpleReqRespCmd(this, {
-                cmd: 'IMS:CAL:Continue', 
-                name: 'cal-cont'
-            });
-            this.#currOpr.start();
+                }));
             return;
         }
 
         if (value.name == 'cal-cont') {
-            this.#currOpr = new PhaseCal(this, this.phases[++this.#phaseCalIndex]);
-            this.#currOpr.start();
+            this.#startOperation(new PhaseCal(this, {
+                phase: this.phases[this.#phaseCalIndex],
+                useMte: this.#mteAddr != null,
+                wait: ! argv.yes,
+            }));
             return;
         }
 
@@ -260,6 +263,11 @@ class Ctrl {
             console.log('Calibration completed. Please power cycle the meter.');
             process.exit(0);
         }
+    }
+
+    #startOperation(opr) {
+        this.#currOpr = opr;
+        opr.start();
     }
 }
 

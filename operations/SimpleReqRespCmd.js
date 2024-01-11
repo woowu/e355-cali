@@ -4,8 +4,6 @@
  * Issue the command and wait for response.
  */
 
-const MAX_RETRIES = 2;
-
 module.exports = class SimpleReqRespCmd {
     #ctrl;
     #cmd;
@@ -14,13 +12,15 @@ module.exports = class SimpleReqRespCmd {
     #cmdTimeout;
     #failCount = 0;
     #timer;
+    #maxRetries;
 
-    constructor(ctrl, { cmd, arg, name, timeout=3000 }) {
+    constructor(ctrl, { cmd, arg, name, timeout=3000, maxRetries = 2 }) {
         this.#ctrl = ctrl;
         this.#cmd = cmd;
         this.#arg = arg;
         this.#cmdTimeout = timeout;
         this.#cmdName = name;
+        this.#maxRetries = maxRetries;
     }
 
     start() {
@@ -33,7 +33,7 @@ module.exports = class SimpleReqRespCmd {
             this.#ctrl.onOprEnd(null, { name: this.#cmdName });
             return;
         }
-        if (line.search('FAIL') >= 0 || ++this.#failCount == MAX_RETRIES) {
+        if (line.search('FAIL') >= 0 || ++this.#failCount == this.maxRetries) {
             this.#ctrl.onOprEnd(new Error(`${this.#cmd} failed`));
             return;
         }
@@ -42,7 +42,7 @@ module.exports = class SimpleReqRespCmd {
 
     #sendReq() {
         this.#timer = this.#ctrl.createTimer(() => {
-            if (++this.#failCount == MAX_RETRIES) {
+            if (++this.#failCount == this.#maxRetries) {
                 this.#ctrl.onOprEnd(new Error('no response from meter'));
                 return;
             }
