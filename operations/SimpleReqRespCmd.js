@@ -15,7 +15,7 @@ module.exports = class SimpleReqRespCmd {
     #failCount = 0;
     #timer;
 
-    constructor(ctrl, { cmd, arg, name, timeout = 3000 }) {
+    constructor(ctrl, { cmd, arg, name, timeout=3000 }) {
         this.#ctrl = ctrl;
         this.#cmd = cmd;
         this.#arg = arg;

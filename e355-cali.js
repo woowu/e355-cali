@@ -6,11 +6,14 @@ const yargs = require('yargs/yargs');
 const readline = require('readline');
 const dump = require('buffer-hexdump');
 const ConnMeter = require('./operations/ConnMeter');
+const SetupLoad = require('./operations/SetupLoad');
 const PhaseCal = require('./operations/PhaseCal');
 const SimpleReqRespCmd = require('./operations/SimpleReqRespCmd');
 
 const POWER_CYCLE_DELAY = 3000;
 const DEFAULT_MTE_PORT = 6200;
+const LINES_NUM = 3;
+const DEFAULT_FREQ = 50e3;
 
 const argv = yargs(process.argv.slice(2))
     .option({
@@ -45,6 +48,17 @@ const argv = yargs(process.argv.slice(2))
             type: 'number',
             default: DEFAULT_MTE_PORT,
         },
+        'l': {
+            alias: 'load',
+            describe: 'Specify the load paramters for one line',
+            type: 'string',
+        },
+        'f': {
+            alias: 'freq',
+            describe: 'Network frequency',
+            type: 'number',
+            default: DEFAULT_FREQ,
+        },
         'e': {
             alias: 'timer-coef',
             describe: 'a number to multiply timeout times for'
@@ -75,10 +89,11 @@ class Ctrl {
                            we will be doing the calibration */
     #calWaitContinue = false;
     #mteAddr;
+    #loadDef;
     #timerCoef = 1;     /* for testing, a number used to multiply timeout
                            times */
 
-    constructor(phaseType, mteAddr) {
+    constructor(phaseType, mteAddr, loadDef) {
         this.#input = '';
 
         this.#phaseType = phaseType;
@@ -92,6 +107,7 @@ class Ctrl {
             throw new Error(`unkonwn phase type: ${phaseType}`);
 
         this.#mteAddr = mteAddr;
+        this.#loadDef = loadDef;
     }
 
     set timerCoef(k) {
@@ -133,6 +149,13 @@ class Ctrl {
         setTimeout(cb, timeout * this.#timerCoef);
     }
 
+    getApiRoot() {
+        if (this.#mteAddr)
+            return `http://${this.#mteAddr.host}:${this.#mteAddr.port}/api`;
+        else
+            return '';
+    }
+
     /**
      * IO routines.
      */
@@ -157,7 +180,7 @@ class Ctrl {
     }
 
     /**
-     * router
+     * Router: determine the next operation after the previous one returns.
      */
     onOprEnd(err, value) {
         if (err) throw(err);
@@ -174,10 +197,16 @@ class Ctrl {
         }
 
         if (value.name == 'cal-init') {
+            this.#currOpr = new SetupLoad(this, this.#loadDef);
+            this.#currOpr.start();
+            return;
+        }
+
+        if (value.name == 'setup-load') {
             this.#phaseCalIndex = 0;
             this.#currOpr = new PhaseCal(this,
                 this.phases[this.#phaseCalIndex],
-                this.#mteAddr);
+                this.#mteAddr != null);
             this.#currOpr.start();
             return;
         }
@@ -187,7 +216,7 @@ class Ctrl {
             if (++this.#phaseCalIndex < this.phases.length) {
                 this.#currOpr = new PhaseCal(this,
                     this.phases[this.#phaseCalIndex],
-                    this.#mteAddr);
+                    this.#mteAddr != null);
                 this.#currOpr.start();
             } else {
                 this.#currOpr = new SimpleReqRespCmd(this, {
@@ -235,10 +264,52 @@ class Ctrl {
     }
 }
 
+function parseLoadDef(spec)
+{
+    const def = {
+        phi_v: Array(LINES_NUM).fill(null),
+        phi_i: Array(LINES_NUM).fill(null),
+        v: Array(LINES_NUM).fill(null),
+        i: Array(LINES_NUM).fill(null),
+    };
+    const quantityNames = ['v', 'i', 'phi_v', 'phi_i'];
+
+    if (! Array.isArray(spec))
+        spec = [spec];
+    for (const s of spec) {
+        const [line, lineSpec] = s.split(':');
+        var l = parseInt(line);
+        if (isNaN(l) || l < 1 || l > LINES_NUM)
+            throw new Error('incorrect line name: ' + line);
+        if (lineSpec == '' || lineSpec === undefined)
+            throw new Error('spec missed for line ' + line);
+        console.log(lineSpec);
+        for (const item of lineSpec.split(',')) {
+            const [name, value] = item.split('=');
+            if (value == '' || value === undefined)
+                throw new Error('bad specification: ' + item);
+            if (! quantityNames.includes(name))
+                throw new Error('unknown quantity: ' + name);
+            def[name][l - 1] = value;
+        }
+    }
+    return def;
+}
+
 var mteAddr = null;
 if (argv.host) mteAddr = { host: argv.host, port: argv.port };
 
-const ctrl = new Ctrl(argv.phaseType, mteAddr);
+var loadDef;
+if (argv.load) {
+    if (! mteAddr) {
+        console.error('setup load needs to define mte address');
+        process.exit(1);
+    }
+    loadDef = parseLoadDef(argv.load);
+    loadDef.f = argv.freq;
+}
+
+const ctrl = new Ctrl(argv.phaseType, mteAddr, loadDef);
 ctrl.timerCoef = argv.timerCoef;
 
 var firstOpr;
@@ -248,7 +319,7 @@ if (! argv.ping)
         arg: ctrl.phases.length.toString(),
         name: 'cal-init',
         timeout: 5000,
-    })
+    });
 else
     firstOpr = new ConnMeter(ctrl);
 

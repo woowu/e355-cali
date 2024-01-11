@@ -7,14 +7,6 @@
 const MAX_RETRIES = 3;
 const WAIT_DELAY = 3000;
 
-/**
- * @param n convert number to an integer y in y x 10^(n)
- */
-function int4e1ToInt(x, n)
-{
-    return parseInt(x[0] * Math.pow(10, x[1] - n));
-}
-
 module.exports = class PhaseCal {
     #ctrl;
     #failCount = 0;
@@ -22,12 +14,12 @@ module.exports = class PhaseCal {
     #phase
     #realValues;
     #discardInput = false;
-    #mteAddr;
+    #useMte;
 
-    constructor(ctrl, phase, mteAddr) {
+    constructor(ctrl, phase, useMte = false) {
         this.#ctrl = ctrl;
         this.#phase = phase;
-        this.#mteAddr = mteAddr;
+        this.#useMte = useMte;
     }
 
     start() {
@@ -70,7 +62,7 @@ module.exports = class PhaseCal {
         this.#discardInput = true;
 
         var val;
-        if (this.#mteAddr)
+        if (this.#useMte)
             val = await this.#getRealValuesFromMte();
         else
             val = await this.#getRealValuesFromUser();
@@ -103,16 +95,14 @@ module.exports = class PhaseCal {
     }
 
     async #getRealValuesFromMte() {
-        const apiRoot =
-            `http://${this.#mteAddr.host}:${this.#mteAddr.port}/api`
-        const resp = await fetch(`${apiRoot}/instantaneous`);
+        const resp = await fetch(`${this.#ctrl.getApiRoot()}/instantaneous`);
         if (! resp.ok) throw new Error(`Mte service status: ${resp.status}`);
         const instant = await resp.json();
         return {
-            v: int4e1ToInt(instant.v[this.#phase - 1], -3),
-            i: int4e1ToInt(instant.i[this.#phase - 1], -3),
-            p: int4e1ToInt(instant.p[this.#phase - 1], -3),
-            q: int4e1ToInt(instant.q[this.#phase - 1], -3),
+            v: Math.round(instant.v[this.#phase - 1]),
+            i: Math.round(instant.i[this.#phase - 1]),
+            p: Math.round(instant.p[this.#phase - 1]),
+            q: Math.round(instant.q[this.#phase - 1]),
         };
     }
 };
