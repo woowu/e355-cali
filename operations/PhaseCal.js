@@ -1,8 +1,6 @@
 const fetch = require('cross-fetch');
 'use strict';
 
-const math = require('mathjs');
-
 /**
  * Issue command IMS:CAL:L<n>
  */
