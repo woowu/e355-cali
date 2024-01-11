@@ -235,7 +235,7 @@ class Ctrl {
                 .then(() => {
                     setTimeout(() => {
                         this.#calWaitContinue = true;
-                        this.#currOpr = new ConnMeter(this);
+                        this.#currOpr = new ConnMeter(this, ! argv.ping);
                         this.#currOpr.start();
                     }, POWER_CYCLE_DELAY);
                 });
@@ -312,15 +312,4 @@ if (argv.load) {
 const ctrl = new Ctrl(argv.phaseType, mteAddr, loadDef);
 ctrl.timerCoef = argv.timerCoef;
 
-var firstOpr;
-if (! argv.ping)
-    firstOpr = new SimpleReqRespCmd(ctrl, {
-        cmd: 'IMS:CALibration:INIT',
-        arg: ctrl.phases.length.toString(),
-        name: 'cal-init',
-        timeout: 5000,
-    });
-else
-    firstOpr = new ConnMeter(ctrl);
-
-ctrl.start(argv.device, argv.baud, firstOpr);
+ctrl.start(argv.device, argv.baud, new ConnMeter(ctrl, ! argv.ping));

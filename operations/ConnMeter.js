@@ -22,12 +22,20 @@ module.exports = class ConnMeter {
     #timer;
     #state = 'wait-resp';   /* 1. wait-resp, 2. confirming */
     #meterIdnRaw;
+    #emptyOpr;
 
-    constructor(ctrl) {
+    constructor(ctrl, emptyOpr=false) {
         this.#ctrl = ctrl;
+        this.#emptyOpr = emptyOpr;
     }
 
     start() {
+        if (this.#emptyOpr) {
+            setImmediate(() => {
+                this.#ctrl.onOprEnd(null, { name: 'conn-meter' });
+            });
+            return;
+        }
         this.#reqIdn();
     }
 
