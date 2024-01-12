@@ -48,7 +48,7 @@ module.exports = class PhaseCal {
             await this.#ctrl.prompt(
                 `calibrate L${this.#phase}. Press enter to continue`);
         else
-            await this.#delay(2000);
+            await this.#delay(1000);
 
         this.#getRealValues()
             .then(v => {
