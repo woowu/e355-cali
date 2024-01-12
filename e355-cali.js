@@ -38,14 +38,14 @@ const argv = yargs(process.argv.slice(2))
         },
         'h': {
             alias: 'host',
-            describe: 'Mte host from which to fetch the real load values.'
-                + ' When no Mte host provided, real load values are required'
-                + ' to be entered manually.',
+            describe: 'Mte service host/ip. '
+                + ' When no Mte service host provided, real load values are'
+                + ' required to be entered manually.',
             type: 'string',
         },
        'p': {
             alias: 'port',
-            describe: 'Mte TCP port on which the Mte service is running', 
+            describe: 'Mte service TCP por', 
             type: 'number',
             default: DEFAULT_MTE_PORT,
         },

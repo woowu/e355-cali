@@ -114,10 +114,10 @@ module.exports = class PhaseCal {
             return {
                 error: null,
                 data: {
-                    v: instant.v[this.#phase - 1],
-                    i: instant.i[this.#phase - 1],
-                    p: instant.p[this.#phase - 1],
-                    q: instant.q[this.#phase - 1],
+                    v: Math.round(instant.v[this.#phase - 1]),
+                    i: Math.round(instant.i[this.#phase - 1]),
+                    p: Math.round(instant.p[this.#phase - 1]),
+                    q: Math.round(instant.q[this.#phase - 1]),
                 },
             };
         } else
