@@ -113,12 +113,12 @@ module.exports = class PhaseCal {
             const instant = await resp.json()
             return {
                 error: null,
-                data: [
-                    instant.v[this.#phase - 1],
-                    instant.i[this.#phase - 1],
-                    instant.p[this.#phase - 1],
-                    instant.q[this.#phase - 1],
-                ],
+                data: {
+                    v: instant.v[this.#phase - 1],
+                    i: instant.i[this.#phase - 1],
+                    p: instant.p[this.#phase - 1],
+                    q: instant.q[this.#phase - 1],
+                },
             };
         } else
             return { error: new Error(`Mte service status: ${resp.status}`) };
@@ -127,6 +127,20 @@ module.exports = class PhaseCal {
     async #getRealValuesFromMte() {
         var errors = 0;
         const samples = [];
+        const MINIMUM_NUM_OF_SAMPLES = 4;
+
+        const areReadingsStablized = key => {
+            if (samples.length < MINIMUM_NUM_OF_SAMPLES) return false;
+            const values = samples.slice(-MINIMUM_NUM_OF_SAMPLES).map(
+                e => e[key]);
+            var i;
+            for (i = 1; i < values.length; ++i) {
+                const err = Math.abs((values[i] - values[i - 1]) / values[i]);
+                if (err * 1e4 > 2) break;
+            }
+            return i == values.length;
+        };
+
         while (errors < 2) {
             const { error, data } = await this.#fetchInstantaneous();
             if (error) {
@@ -135,20 +149,14 @@ module.exports = class PhaseCal {
                 await this.#delay(3000);
             } else {
                 errors = 0;
-                console.log('got MTE reading, (v,i,p,q) ='
-                    + ` (${data[0]}, ${data[1]}, ${data[2]}, ${data[3]})`);
+                console.log('got MTE reading:', data);
                 samples.push(data);
-                if (samples.length == 3) break; // TODO
+                if (areReadingsStablized('p') && areReadingsStablized('q'))
+                    break;
                 await this.#delay(1000);
             }
         }
 
-        const data = samples.slice(-1)[0]; //math.mean(samples, 0);
-        return {
-            v: Math.round(data[0]),
-            i: Math.round(data[1]),
-            p: Math.round(data[2]),
-            q: Math.round(data[3]),
-        };
+        return samples.slice(-1)[0];
     }
 };
