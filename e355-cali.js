@@ -260,7 +260,19 @@ class Ctrl {
         }
 
         if (value.name == 'cal-wr') {
-            console.log('Calibration completed. Please power cycle the meter.');
+            console.log('Warm-restart meter.');
+            this.#startOperation(new SimpleReqRespCmd(this, {
+                cmd: 'SYSTem:POFF',
+                name: 'warm-restart',
+                timeout: 3000,
+                noResp: true,
+            }));
+            return;
+            process.exit(0);
+        }
+
+        if (value.name == 'warm-restart') {
+            console.log('Calibration completed.');
             process.exit(0);
         }
     }

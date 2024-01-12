@@ -13,14 +13,18 @@ module.exports = class SimpleReqRespCmd {
     #failCount = 0;
     #timer;
     #maxRetries;
+    #noResp;
 
-    constructor(ctrl, { cmd, arg, name, timeout=3000, maxRetries = 2 }) {
+    constructor(ctrl, {
+        cmd, arg, name, timeout=3000, maxRetries = 2, noResp = false
+    }) {
         this.#ctrl = ctrl;
         this.#cmd = cmd;
         this.#arg = arg;
         this.#cmdTimeout = timeout;
         this.#cmdName = name;
         this.#maxRetries = maxRetries;
+        this.#noResp = noResp;
     }
 
     start() {
@@ -42,6 +46,10 @@ module.exports = class SimpleReqRespCmd {
 
     #sendReq() {
         this.#timer = this.#ctrl.createTimer(() => {
+            if (this.#noResp) {
+                this.#ctrl.onOprEnd(null, { name: this.#cmdName });
+                return;
+            }
             if (++this.#failCount == this.#maxRetries) {
                 this.#ctrl.onOprEnd(new Error('no response from meter'));
                 return;

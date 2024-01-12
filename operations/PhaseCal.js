@@ -48,14 +48,6 @@ module.exports = class PhaseCal {
             await this.#ctrl.prompt(
                 `calibrate L${this.#phase}. Press enter to continue`);
 
-        this.#timer = this.#ctrl.createTimer(() => {
-            if (++this.#failCount == MAX_RETRIES) {
-                this.#ctrl.onOprEnd(new Error(`calibration phase ${this.#phase}`));
-                return;
-            }
-            this.#reqCalibration();
-        }, WAIT_DELAY);
-
         this.#getRealValues()
             .then(v => {
                 this.#realValues = v;
@@ -108,8 +100,17 @@ module.exports = class PhaseCal {
     }
 
     async #fetchInstantaneous() {
+        this.#timer = this.#ctrl.createTimer(() => {
+            if (++this.#failCount == MAX_RETRIES) {
+                this.#ctrl.onOprEnd(new Error(`polling MTE failed`));
+                return;
+            }
+            this.#fetchInstantaneous();
+        }, WAIT_DELAY);
+
         const resp = await fetch(`${this.#ctrl.getApiRoot()}/instantaneous`);
         if (resp.ok) {
+            clearTimeout(this.#timer);
             const instant = await resp.json()
             return {
                 error: null,
@@ -120,8 +121,7 @@ module.exports = class PhaseCal {
                     q: Math.round(instant.q[this.#phase - 1]),
                 },
             };
-        } else
-            return { error: new Error(`Mte service status: ${resp.status}`) };
+        }
     }
 
     async #getRealValuesFromMte() {
