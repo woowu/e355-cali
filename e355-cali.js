@@ -273,6 +273,8 @@ class Ctrl {
 
 function parseLoadDef(spec)
 {
+    const phiVRef = [0, 240e3, 120e3];
+
     const def = {
         phi_v: Array(LINES_NUM).fill(null),
         phi_i: Array(LINES_NUM).fill(null),
@@ -280,6 +282,11 @@ function parseLoadDef(spec)
         i: Array(LINES_NUM).fill(null),
     };
     const quantityNames = ['v', 'i', 'phi_v', 'phi_i'];
+
+    const normalizeAngle = phi => {
+        while (phi < 0) phi += 360e3;
+        return phi % 360e3;
+    };
 
     if (! Array.isArray(spec))
         spec = [spec];
@@ -294,9 +301,15 @@ function parseLoadDef(spec)
             const [name, value] = item.split('=');
             if (value == '' || value === undefined)
                 throw new Error('bad specification: ' + item);
-            if (! quantityNames.includes(name))
-                throw new Error('unknown quantity: ' + name);
-            def[name][l - 1] = value;
+            if (name == 'phi') {
+                def.phi_v[l - 1] = phiVRef[l - 1];
+                def.phi_i[l - 1] = normalizeAngle(phiVRef[l - 1]
+                    - parseInt(value));
+            } else {
+                if (! quantityNames.includes(name))
+                    throw new Error('unknown quantity: ' + name);
+                def[name][l - 1] = value;
+            }
         }
     }
     return def;

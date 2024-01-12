@@ -6,6 +6,7 @@ const fetch = require('cross-fetch');
  */
 
 const MAX_RETRIES = 2;
+const LINES_NUM = 3;
 
 module.exports = class SetupLoad {
     #ctrl;
@@ -36,8 +37,13 @@ module.exports = class SetupLoad {
             this.#setupLoad();
         }, this.#timeout);
 
-        //const head = new Headers();
-        //head.append('Content-Type', 'application/json');
+        console.log('setup load:');
+        for (var i = 0; i < LINES_NUM; ++i)
+            console.log(`  L${i + 1}: v=${this.#loadDef.v[i]}`
+                + ` i=${this.#loadDef.i[i]}`
+                + ` phi_v=${this.#loadDef.phi_v[i]}`
+                + ` phi_i=${this.#loadDef.phi_i[i]}`);
+
         const resp = await fetch(`${this.#ctrl.getApiRoot()}/loadef`, {
             method: 'PUT',
             headers: {
