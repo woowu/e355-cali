@@ -26,11 +26,7 @@ module.exports = class PhaseCal {
     }
 
     start() {
-        this.#getRealValues()
-            .then(v => {
-                this.#realValues = v;
-                this.#reqCalibration();
-            });
+        this.#reqCalibration();
     }
 
     onInput(line) {
@@ -59,9 +55,14 @@ module.exports = class PhaseCal {
             }
             this.#reqCalibration();
         }, WAIT_DELAY);
-        this.#ctrl.writeMeter(`IMS:CALibration:L${this.#phase}`
-            + ` ${this.#realValues.v},${this.#realValues.i},`
-            + `${this.#realValues.p},${this.#realValues.q}\r`);
+
+        this.#getRealValues()
+            .then(v => {
+                this.#realValues = v;
+                this.#ctrl.writeMeter(`IMS:CALibration:L${this.#phase}`
+                    + ` ${this.#realValues.v},${this.#realValues.i},`
+                    + `${this.#realValues.p},${this.#realValues.q}\r`);
+            });
     }
 
     async #getRealValues() {

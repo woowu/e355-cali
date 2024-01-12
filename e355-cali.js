@@ -254,7 +254,7 @@ class Ctrl {
             this.#startOperation(new PhaseCal(this, {
                 phase: this.phases[this.#phaseCalIndex],
                 useMte: this.#mteAddr != null,
-                wait: ! argv.yes,
+                wait: false,
             }));
             return;
         }
