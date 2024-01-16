@@ -236,7 +236,7 @@ class Ctrl {
                 await this.prompt(
                     'Switch power supply to element 2 and press enter.');
                 this.#startOperation(new SetupLoad(this. this.#loadDef,
-                    name: 'setup-load-2'));
+                    name='setup-load-2'));
             } else
                 this.#startOperation(new PhaseCal(this, {
                     phase: this.phases[this.#phaseCalIndex],
