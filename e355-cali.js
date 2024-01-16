@@ -236,7 +236,7 @@ class Ctrl {
             if (this.#phaseType == '1p2e' && this.#phaseCalIndex == 1) {
                 await this.prompt(
                     'Switch power supply to element 2 and press enter.');
-                this.#startOperation(new SetupLoad(this. this.#loadDef,
+                this.#startOperation(new SetupLoad(this, this.#loadDef,
                     name='setup-load-2'));
             } else
                 this.#startOperation(new PhaseCal(this, {
