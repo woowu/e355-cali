@@ -16,7 +16,7 @@ module.exports = class SetupLoad {
     #timer;
     #name;
 
-    constructor(ctrl, loadDef, timeout=5000, name='setup-load') {
+    constructor(ctrl, loadDef, { timeout=5000, name='setup-load' }) {
         this.#ctrl = ctrl;
         this.#loadDef = loadDef;
         this.#timeout = timeout;

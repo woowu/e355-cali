@@ -237,7 +237,7 @@ class Ctrl {
                 await this.prompt(
                     'Switch power supply to element 2 and press enter.');
                 this.#startOperation(new SetupLoad(this, this.#loadDef,
-                    name='setup-load-2'));
+                    { name: 'setup-load-2' }));
             } else
                 this.#startOperation(new PhaseCal(this, {
                     phase: this.phases[this.#phaseCalIndex],
@@ -356,7 +356,7 @@ ctrl.timerCoef = argv.timerCoef;
 
 var firstOpr;
 if (argv.load)
-    firstOpr = new SetupLoad(ctrl, loadDef);
+    firstOpr = new SetupLoad(ctrl, loadDef, {});
 else
     firstOpr = new ConnMeter(ctrl, ! argv.ping);
 
