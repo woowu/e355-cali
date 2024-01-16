@@ -13,14 +13,23 @@ module.exports = class PhaseCal {
     #failCount = 0;
     #timer;
     #phase
+    #readPhase
     #realValues;
     #discardInput = false;
     #useMte;
     #wait;
 
-    constructor(ctrl, { phase, useMte = false, wait = true }) {
+    /**
+     * In normal cases, the phase to read back the load quantities should be the
+     * same as the phase to do the calibration. But for the 1p2e meter, we have
+     * to read the indeed connected phase which may not be the phases which are
+     * doing the calibration (L2 or L3). That's the reason we provided another
+     * argument `readphase` to make 1p2e calibration possible.
+     */
+    constructor(ctrl, { phase, readPhase = null, useMte = false, wait = true }) {
         this.#ctrl = ctrl;
         this.#phase = phase;
+        this.#readPhase = readPhase;
         this.#useMte = useMte;
         this.#wait = wait;
     }
@@ -52,10 +61,8 @@ module.exports = class PhaseCal {
 
         this.#getRealValues()
             .then(v => {
-                this.#realValues = v;
                 this.#ctrl.writeMeter(`IMS:CALibration:L${this.#phase}`
-                    + ` ${this.#realValues.v},${this.#realValues.i},`
-                    + `${this.#realValues.p},${this.#realValues.q}\r`);
+                    + ` ${v.v},${v.i},${v.p},${v.q}\r`);
             });
     }
 
@@ -114,13 +121,14 @@ module.exports = class PhaseCal {
         if (resp.ok) {
             clearTimeout(this.#timer);
             const instant = await resp.json()
+            var readPhase = this.#readPhase != null ? this.#readPhase : this.#phase;
             return {
                 error: null,
                 data: {
-                    v: Math.round(instant.v[this.#phase - 1]),
-                    i: Math.round(instant.i[this.#phase - 1]),
-                    p: Math.round(instant.p[this.#phase - 1]),
-                    q: Math.round(instant.q[this.#phase - 1]),
+                    v: Math.round(instant.v[readPhase - 1]),
+                    i: Math.round(instant.i[readPhase - 1]),
+                    p: Math.round(instant.p[readPhase - 1]),
+                    q: Math.round(instant.q[readPhase - 1]),
                 },
             };
         }

@@ -212,6 +212,7 @@ class Ctrl {
             this.#phaseCalIndex = 0;
             this.#startOperation(new PhaseCal(this, {
                 phase: this.phases[this.#phaseCalIndex],
+                readPhase: this.#phaseType == '1p2e' ? 1 : this.phases[this.#phaseCalIndex],
                 useMte: this.#mteAddr != null,
                 wait: ! argv.yes,
             }));
@@ -240,6 +241,8 @@ class Ctrl {
             } else
                 this.#startOperation(new PhaseCal(this, {
                     phase: this.phases[this.#phaseCalIndex],
+                    readPhase: this.#phaseType == '1p2e'
+                        ? 1 : this.phases[this.#phaseCalIndex],
                     useMte: this.#mteAddr != null,
                     wait: ! argv.yes,
                 }));
@@ -259,6 +262,8 @@ class Ctrl {
         if (value.name == 'cal-cont') {
             this.#startOperation(new PhaseCal(this, {
                 phase: this.phases[this.#phaseCalIndex],
+                readPhase: this.#phaseType == '1p2e'
+                    ? 1 : this.phases[this.#phaseCalIndex],
                 useMte: this.#mteAddr != null,
                 wait: false,
             }));
