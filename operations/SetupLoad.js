@@ -15,10 +15,11 @@ module.exports = class SetupLoad {
     #timeout;
     #timer;
 
-    constructor(ctrl, loadDef, timeout=5000) {
+    constructor(ctrl, loadDef, timeout=5000, name='setup-load') {
         this.#ctrl = ctrl;
         this.#loadDef = loadDef;
         this.#timeout = timeout;
+        this.#name = name;
     }
 
     start() {
@@ -56,7 +57,7 @@ module.exports = class SetupLoad {
         clearTimeout(this.#timer);
         if (data && data.result == 'success') {
             console.log('setup load succeeded');
-            this.#ctrl.onOprEnd(null, { name: 'setup-load' });
+            this.#ctrl.onOprEnd(null, { name });
         } else
             setImmediate(() => this.#setupLoad());
     }

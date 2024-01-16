@@ -235,18 +235,24 @@ class Ctrl {
             if (this.#phaseType == '1p2e' && this.#phaseCalIndex == 1) {
                 await this.prompt(
                     'Switch power supply to element 2 and press enter.');
-                this.#startOperation(new SimpleReqRespCmd(this, {
-                    cmd: 'IMS:CAL:Continue', 
-                    name: 'cal-cont',
-                    /* wait some more time since meter's just powered up */
-                    maxRetries: 5,
-                }));
+                this.#startOperation(new SetupLoad(this. this.#loadDef,
+                    name: 'setup-load-2'));
             } else
                 this.#startOperation(new PhaseCal(this, {
                     phase: this.phases[this.#phaseCalIndex],
                     useMte: this.#mteAddr != null,
                     wait: ! argv.yes,
                 }));
+            return;
+        }
+
+        if (value.name == 'setup-load-2') {
+            this.#startOperation(new SimpleReqRespCmd(this, {
+                cmd: 'IMS:CAL:Continue', 
+                name: 'cal-cont',
+                /* wait some more time since meter's just powered up */
+                maxRetries: 5,
+            }));
             return;
         }
 
