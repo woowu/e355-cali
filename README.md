@@ -20,7 +20,7 @@ The general process of an automatic calibration is:
 ## Features
 
 - Support all the meter types: 3p, 1p, 1p2e
-- All manual calibration without automatic interaction with a MTE.
+- Allow manual calibration without automatic interaction with a MTE.
 - Talk to the MTE service in order to isolate the changes from different type of MTE's.
 - The MTE service can be deployed to any suitable location in a network, separated
   from the laptop running e355-cali and connected to a meter.
@@ -69,10 +69,11 @@ phase-number:key=value,key=value,...
 
 Keys are:
 
-- `v` for voltage. value is in mV.
-- `l` for current. value is in mA.
-- `phi` for phase angle . value is in $10^{-3}$ degree.
+- **v** for voltage; value is in mV.
+- **l** for current; value is in mA.
+- **phi** for phase angle; value is in $10^{-3}$ degree, negative degrees are allowed.
 
+For example, `-l l:v=240e3,i=4.95e3,phi=-30e3` specifies a phase one's load is 240V, 4.95A at quadrant-four (-30 degree).
 
 Example command line:
 
