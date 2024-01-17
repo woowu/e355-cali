@@ -45,17 +45,18 @@ module.exports = class SimpleReqRespCmd {
     }
 
     #sendReq() {
-        this.#timer = this.#ctrl.createTimer(() => {
-            if (this.#noResp) {
+        if (this.#noResp)
+            this.#timer = setTimeout(() => {
                 this.#ctrl.onOprEnd(null, { name: this.#cmdName });
-                return;
-            }
-            if (++this.#failCount == this.#maxRetries) {
-                this.#ctrl.onOprEnd(new Error('no response from meter'));
-                return;
-            }
-            this.#sendReq();
-        }, this.#cmdTimeout);
+            }, this.#cmdTimeout);
+        else
+            this.#timer = this.#ctrl.createTimer(() => {
+                if (++this.#failCount == this.#maxRetries) {
+                    this.#ctrl.onOprEnd(new Error('no response from meter'));
+                    return;
+                }
+                this.#sendReq();
+            }, this.#cmdTimeout);
         this.#ctrl.writeMeter(this.#arg ? `${this.#cmd} ${this.#arg}\r`
             : `${this.#cmd}\r`);
     }
