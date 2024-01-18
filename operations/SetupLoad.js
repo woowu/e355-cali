@@ -1,10 +1,6 @@
 const fetch = require('cross-fetch');
 'use strict';
 
-/**
- * Issue the command and wait for response.
- */
-
 const MAX_RETRIES = 2;
 const LINES_NUM = 3;
 
@@ -33,7 +29,7 @@ module.exports = class SetupLoad {
     async #setupLoad() {
         this.#timer = this.#ctrl.createTimer(() => {
             if (++this.#failCount == MAX_RETRIES) {
-                this.#ctrl.onOprEnd(new Error('no response from meter'));
+                this.#ctrl.onOprEnd(new Error('no response from mte'));
                 return;
             }
             this.#setupLoad();

@@ -17,6 +17,7 @@ const IDN_FIELDS_MIN_NR = 3;
 
 module.exports = class ConnMeter {
     #ctrl;
+    #name;
     #failCount = 0;
     #confirmingCount;
     #timer;
@@ -25,15 +26,16 @@ module.exports = class ConnMeter {
     #emptyOpr;
     #id;
 
-    constructor(ctrl, emptyOpr=false) {
+    constructor(ctrl, name, emptyOpr=false) {
         this.#ctrl = ctrl;
+        this.#name = name;
         this.#emptyOpr = emptyOpr;
     }
 
     start() {
         if (this.#emptyOpr) {
             setImmediate(() => {
-                this.#ctrl.onOprEnd(null, { name: 'conn-meter' });
+                this.#ctrl.onOprEnd(null, { name: this.#name });
             });
             return;
         }
@@ -75,7 +77,7 @@ module.exports = class ConnMeter {
                 + ` Product: ${components[1]}`
                 + ` Ver: ${components[2]}`
                 + ` Build: ${components[3]}`);
-            this.#ctrl.onOprEnd(null, { name: 'conn-meter' });
+            this.#ctrl.onOprEnd(null, { name: this.#name });
             return;
         }
         this.#reqIdn();

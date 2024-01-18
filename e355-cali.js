@@ -9,12 +9,22 @@ const ConnMeter = require('./operations/ConnMeter');
 const SetupLoad = require('./operations/SetupLoad');
 const PhaseCal = require('./operations/PhaseCal');
 const SimpleReqRespCmd = require('./operations/SimpleReqRespCmd');
+const SimpleFetch = require('./operations/SimpleFetch');
+const AccuracyPolling = require('./operations/AccuracyPolling');
 
 const POWER_CYCLE_DELAY = 3000;
 const DEFAULT_MTE_PORT = 6200;
 const LINES_NUM = 3;
 const DEFAULT_FREQ = 50e3;
 const LOAD_STABLE_WAIT = 3000;
+const ACCURACY_POLLING_START_WAIT = 3000;
+
+const putOption = {
+    method: 'PUT',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+};
 
 const argv = yargs(process.argv.slice(2))
     .option({
@@ -193,12 +203,12 @@ class Ctrl {
             console.log(`wait ${LOAD_STABLE_WAIT/1000} sec`
                 + ' for load stablizing');
             setTimeout(() => {
-                this.#startOperation(new ConnMeter(ctrl, ! argv.ping));
+                this.#startOperation(new ConnMeter(this, 'conn-1', ! argv.ping));
             }, LOAD_STABLE_WAIT);
             return;
         }
 
-        if (value.name == 'conn-meter') {
+        if (value.name == 'conn-1') {
             this.#startOperation(new SimpleReqRespCmd(this, {
                 cmd: 'IMS:CALibration:INIT',
                 arg: this.phases.length.toString(),
@@ -279,11 +289,53 @@ class Ctrl {
                 noResp: true,
             }));
             return;
-            process.exit(0);
         }
 
         if (value.name == 'warm-restart') {
-            console.log('Calibration completed.');
+            console.log('Wait meter connected again');
+            this.#startOperation(new ConnMeter(this, 'conn-2', ! argv.ping));
+            return;
+        }
+
+        if (value.name == 'conn-2') {
+            if (this.#loadDef) {
+                console.log('Start accuracy test');
+                this.#startOperation(new SimpleFetch(
+                    this,
+                    'start-accuracy-test',
+                    `${this.getApiRoot()}/test/start/1`,
+                    putOption,
+                    { timeout: 10000 }
+                ));
+            } else {
+                console.log('Calibration completed');
+                process.exit(0);
+            }
+            return;
+        }
+
+        if (value.name == 'start-accuracy-test') {
+            console.log('poll accuracy result');
+            setTimeout(() => {
+                this.#startOperation(new AccuracyPolling(this));
+            }, ACCURACY_POLLING_START_WAIT);
+            return;
+        }
+
+        if (value.name == 'accuracy-polling') {
+            console.log('stop accuracy test');
+            this.#startOperation(new SimpleFetch(
+                this,
+                'stop-accuracy-test',
+                `${this.getApiRoot()}/test/stop/1`,
+                putOption,
+                { timeout: 1000 }
+            ));
+            return;
+        }
+
+        if (value.name == 'stop-accuracy-test') {
+            console.log('Calibration completed');
             process.exit(0);
         }
     }
@@ -358,6 +410,6 @@ var firstOpr;
 if (argv.load)
     firstOpr = new SetupLoad(ctrl, loadDef, {});
 else
-    firstOpr = new ConnMeter(ctrl, ! argv.ping);
+    firstOpr = new ConnMeter(ctrl, 'conn-1', ! argv.ping);
 
 ctrl.start(argv.device, argv.baud, firstOpr);
