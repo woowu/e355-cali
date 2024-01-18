@@ -13,6 +13,7 @@ const SimpleFetch = require('./operations/SimpleFetch');
 const AccuracyPolling = require('./operations/AccuracyPolling');
 
 const POWER_CYCLE_DELAY = 3000;
+const DELAY_BEFORE_CAL = 2000;
 const DEFAULT_MTE_PORT = 6200;
 const LINES_NUM = 3;
 const DEFAULT_FREQ = 50e3;
@@ -226,13 +227,15 @@ class Ctrl {
         }
 
         if (value.name == 'cal-init') {
-            this.#phaseCalIndex = 0;
-            this.#startOperation(new PhaseCal(this, {
-                phase: this.phases[this.#phaseCalIndex],
-                readPhase: this.#phaseType == '1p2e' ? 1 : this.phases[this.#phaseCalIndex],
-                useMte: this.#mteAddr != null,
-                wait: ! argv.yes,
-            }));
+            setTimeout(() => {
+                this.#phaseCalIndex = 0;
+                this.#startOperation(new PhaseCal(this, {
+                    phase: this.phases[this.#phaseCalIndex],
+                    readPhase: this.#phaseType == '1p2e' ? 1 : this.phases[this.#phaseCalIndex],
+                    useMte: this.#mteAddr != null,
+                    wait: ! argv.yes,
+                }));
+            }, DELAY_BEFORE_CAL);
             return;
         }
 
@@ -255,14 +258,17 @@ class Ctrl {
                     'Switch power supply to element 2 and press enter.');
                 this.#startOperation(new SetupLoad(this, this.#loadDef,
                     { name: 'setup-load-2' }));
-            } else
-                this.#startOperation(new PhaseCal(this, {
-                    phase: this.phases[this.#phaseCalIndex],
-                    readPhase: this.#phaseType == '1p2e'
-                        ? 1 : this.phases[this.#phaseCalIndex],
-                    useMte: this.#mteAddr != null,
-                    wait: ! argv.yes,
-                }));
+            } else {
+                setTimeout(() => {
+                    this.#startOperation(new PhaseCal(this, {
+                        phase: this.phases[this.#phaseCalIndex],
+                        readPhase: this.#phaseType == '1p2e'
+                            ? 1 : this.phases[this.#phaseCalIndex],
+                        useMte: this.#mteAddr != null,
+                        wait: ! argv.yes,
+                    }));
+                }, DELAY_BEFORE_CAL);
+            }
             return;
         }
 

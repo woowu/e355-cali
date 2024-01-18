@@ -137,7 +137,7 @@ module.exports = class PhaseCal {
     async #getRealValuesFromMte() {
         var errors = 0;
         const samples = [];
-        const MINIMUM_NUM_OF_SAMPLES = 4;
+        const MINIMUM_NUM_OF_SAMPLES = 5;
 
         const areReadingsStablized = key => {
             if (samples.length < MINIMUM_NUM_OF_SAMPLES) return false;
@@ -146,7 +146,7 @@ module.exports = class PhaseCal {
             var i;
             for (i = 1; i < values.length; ++i) {
                 const err = Math.abs((values[i] - values[i - 1]) / values[i]);
-                if (err * 1e4 > 2) break;
+                if (err * 1e4 > 1) break;
             }
             return i == values.length;
         };
