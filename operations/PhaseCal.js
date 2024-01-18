@@ -137,18 +137,20 @@ module.exports = class PhaseCal {
     async #getRealValuesFromMte() {
         var errors = 0;
         const samples = [];
-        const MINIMUM_NUM_OF_SAMPLES = 5;
+        const MINIMUM_NUM_OF_SAMPLES = 6;
 
         const areReadingsStablized = key => {
+            const stdOverMean = vector => {
+                var total = vector.reduce((acc, c) => acc + c, 0);
+                const mean = total / vector.length;
+                total = vector.reduce((acc, c) => acc + (c - mean)^2, 0);
+                return Math.sqrt(total / vector.length) / mean;
+            };
+
             if (samples.length < MINIMUM_NUM_OF_SAMPLES) return false;
             const values = samples.slice(-MINIMUM_NUM_OF_SAMPLES).map(
                 e => e[key]);
-            var i;
-            for (i = 1; i < values.length; ++i) {
-                const err = Math.abs((values[i] - values[i - 1]) / values[i]);
-                if (err * 1e4 > 1) break;
-            }
-            return i == values.length;
+            return stdOverMean(values) < 5e-6;
         };
 
         while (errors < 2) {
