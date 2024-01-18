@@ -18,6 +18,13 @@ const LINES_NUM = 3;
 const DEFAULT_FREQ = 50e3;
 const LOAD_STABLE_WAIT = 3000;
 const ACCURACY_POLLING_START_WAIT = 3000;
+const loadDefForAccuracyTest = {
+    phi_v: [ 0, 240000, 120000 ],
+    phi_i: [ 0, 240000, 120000 ],
+    v: [ '230e3', '230e3', '230e3' ],
+    i: [ '10e3', '10e3', '10e3' ],
+    f: 50000
+};
 
 const putOption = {
     method: 'PUT',
@@ -299,18 +306,25 @@ class Ctrl {
 
         if (value.name == 'conn-2') {
             if (this.#loadDef) {
-                console.log('Start accuracy test');
-                this.#startOperation(new SimpleFetch(
-                    this,
-                    'start-accuracy-test',
-                    `${this.getApiRoot()}/test/start/1`,
-                    putOption,
-                    { timeout: 10000 }
-                ));
+                console.log('Setup load for accuracy test');
+                this.#startOperation(new SetupLoad(this, loadDefForAccuracyTest,
+                    { name: 'setup-load-3' }));
             } else {
                 console.log('Calibration completed');
                 process.exit(0);
             }
+            return;
+        }
+
+        if (value.name == 'setup-load-3') {
+            console.log('Start accuracy test');
+            this.#startOperation(new SimpleFetch(
+                this,
+                'start-accuracy-test',
+                `${this.getApiRoot()}/test/start/1`,
+                putOption,
+                { timeout: 10000 }
+            ));
             return;
         }
 
