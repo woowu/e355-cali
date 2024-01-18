@@ -1,7 +1,7 @@
 const fetch = require('cross-fetch');
 'use strict';
 
-const POLL_DELAY = 2000;
+const POLL_DELAY = 5000;
 const MIN_POLL_COUNT = 5;
 
 module.exports = class AccuracyPolling {
