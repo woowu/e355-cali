@@ -32,14 +32,14 @@ module.exports = class SimpleFetch {
     }
 
     async #startOperation() {
-        this.#timer = setTimeout(() => {
-            if (++this.#failCount == this.#maxRetries) {
-                this.#ctrl.onOprEnd(new Error(
-                    `${this.#name}: no response from server`));
-                return;
-            }
-            this.#startOperation();
-        }, this.#timeout);
+        //this.#timer = setTimeout(() => {
+        //    if (++this.#failCount == this.#maxRetries) {
+        //        this.#ctrl.onOprEnd(new Error(
+        //            `${this.#name}: no response from server`));
+        //        return;
+        //    }
+        //    this.#startOperation();
+        //}, this.#timeout);
 
         const resp = await fetch(this.#url, this.#fetchOption);
         if (! resp.ok) throw new Error(`Mte service status: ${resp.status}`);
@@ -47,7 +47,7 @@ module.exports = class SimpleFetch {
         clearTimeout(this.#timer);
         if (data && data.result == 'success') {
             console.log(`${this.#name} succeeded`);
-            this.#ctrl.onOprEnd(null, { name: 'start-accuracy-test' });
+            this.#ctrl.onOprEnd(null, { name: this.#name });
         } else
             setImmediate(() => this.#startOperation());
     }

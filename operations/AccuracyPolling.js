@@ -1,21 +1,15 @@
 const fetch = require('cross-fetch');
 'use strict';
 
-const MAX_RETRIES = 2;
 const POLL_DELAY = 2000;
-const MIN_POLL_COUNT = 3;
+const MIN_POLL_COUNT = 5;
 
 module.exports = class AccuracyPolling {
     #ctrl;
-    #failCount = 0;
-    #timeout;
-    #timer;
     #resultCount = 0;
 
-    constructor(ctrl, option) {
-        if (option === undefined) option = { timeout: 10000 };
+    constructor(ctrl) {
         this.#ctrl = ctrl;
-        this.#timeout = option.timeout;
     }
 
     start() {
@@ -26,18 +20,9 @@ module.exports = class AccuracyPolling {
     }
 
     async #poll() {
-        this.#timer = setTimeout(() => {
-            if (++this.#failCount == MAX_RETRIES) {
-                this.#ctrl.onOprEnd(new Error('no response from mte'));
-                return;
-            }
-            this.#poll();
-        }, this.#timeout);
-
         const resp = await fetch(`${this.#ctrl.getApiRoot()}/test/result/1`);
         if (! resp.ok) throw new Error(`Mte service status: ${resp.status}`);
         const data = await resp.json();
-        clearTimeout(this.#timer);
         console.log(data);
 
         if (data.seqno > 1) ++this.#resultCount;
@@ -47,8 +32,6 @@ module.exports = class AccuracyPolling {
             return;
         }
 
-        this.#timer = setTimeout(() => {
-            this.#poll();
-        }, POLL_DELAY);
+        setTimeout(() => this.#poll(), POLL_DELAY);
     }
 };
