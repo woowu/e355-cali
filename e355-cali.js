@@ -19,11 +19,18 @@ const LINES_NUM = 3;
 const DEFAULT_FREQ = 50e3;
 const LOAD_STABLE_WAIT = 3000;
 const ACCURACY_POLLING_START_WAIT = 3000;
-const loadDefForAccuracyTest = {
+const loadDefForAccuracyTest3p = {
     phi_v: [ 0, 240000, 120000 ],
     phi_i: [ 0, 240000, 120000 ],
-    v: [ '230e3', '230e3', '230e3' ],
-    i: [ '10e3', '10e3', '10e3' ],
+    v: [ 230e3, 230e3, 230e3 ],
+    i: [ 10e3, 10e3, 10e3 ],
+    f: 50000
+};
+const loadDefForAccuracyTest1p = {
+    phi_v: [ 0, 240000, 120000 ],
+    phi_i: [ 0, 240000, 120000 ],
+    v: [ 230e3, 0, 0 ],
+    i: [ 10e3, 0, 0 ],
     f: 50000
 };
 
@@ -313,7 +320,9 @@ class Ctrl {
         if (value.name == 'conn-2') {
             if (this.#loadDef) {
                 console.log('Setup load for accuracy test');
-                this.#startOperation(new SetupLoad(this, loadDefForAccuracyTest,
+                this.#startOperation(new SetupLoad(this,
+                    this.#phaseType == '3p' ? loadDefForAccuracyTest3p
+                        : loadDefForAccuracyTest1p,
                     { name: 'setup-load-3' }));
             } else {
                 console.log('Calibration completed');
