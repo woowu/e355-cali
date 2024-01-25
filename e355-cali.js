@@ -85,6 +85,11 @@ const argv = yargs(process.argv.slice(2))
             type: 'number',
             default: DEFAULT_FREQ,
         },
+        'C': {
+            alias: 'no-cali',
+            describe: 'Skip calibration, execute accurcy check only',
+            type: 'boolean',
+        },
         'y': {
             alias: 'yes',
             describe: 'skip the questionaire for preparing meter before calibrating each phase',
@@ -111,11 +116,11 @@ const argv = yargs(process.argv.slice(2))
 class Ctrl {
     phases = [];
 
+    #options = {};
     #dev;               /* serial device linked to meter */
     #rl;                /* console readline interface */
     #currOpr;           /* current operation object in the pipeline */
     #input;             /* unprecessed meter input */
-    #phaseType;         /* 1p, 3p, 1p2e */
     #phaseCalIndex;     /* the position into the phases array, of which
                            we will be doing the calibration */
     #mteAddr;
@@ -123,18 +128,18 @@ class Ctrl {
     #timerCoef = 1;     /* for testing, a number used to multiply timeout
                            times */
 
-    constructor(phaseType, mteAddr, loadDef) {
+    constructor(options, mteAddr, loadDef) {
         this.#input = '';
 
-        this.#phaseType = phaseType;
-        if (phaseType == '3p')
+        if (options) this.#options = options;
+        if (options.phaseType == '3p')
             this.phases = [1, 2, 3];
-        else if (phaseType == '1p')
+        else if (options.phaseType == '1p')
             this.phases = [1];
-        else if (phaseType == '1p2e')
+        else if (options.phaseType == '1p2e')
             this.phases = [2, 3];
         else
-            throw new Error(`unkonwn phase type: ${phaseType}`);
+            throw new Error(`unkonwn phase type: ${options.phaseType}`);
 
         this.#mteAddr = mteAddr;
         this.#loadDef = loadDef;
@@ -218,12 +223,21 @@ class Ctrl {
             console.log(`wait ${LOAD_STABLE_WAIT/1000} sec`
                 + ' for load stablizing');
             setTimeout(() => {
-                this.#startOperation(new ConnMeter(this, 'conn-1', ! argv.ping));
+                this.#startOperation(new ConnMeter(this, 'conn-1',
+                    ! this.#options.ping));
             }, LOAD_STABLE_WAIT);
             return;
         }
 
-        if (value.name == 'conn-1') {
+        if (value.name == 'conn-1' && this.#options.noCali) {
+            this.#startOperation(new SetupLoad(this,
+                this.#options.phaseType == '3p' ? loadDefForAccuracyTest3p
+                    : loadDefForAccuracyTest1p,
+                { name: 'setup-load-3' }));
+            return;
+        }
+
+        if (value.name == 'conn-1' && ! this.#options.noCali) {
             this.#startOperation(new SimpleReqRespCmd(this, {
                 cmd: 'IMS:CALibration:INIT',
                 arg: this.phases.length.toString(),
@@ -238,9 +252,10 @@ class Ctrl {
                 this.#phaseCalIndex = 0;
                 this.#startOperation(new PhaseCal(this, {
                     phase: this.phases[this.#phaseCalIndex],
-                    readPhase: this.#phaseType == '1p2e' ? 1 : this.phases[this.#phaseCalIndex],
+                    readPhase: this.#options.phaseType == '1p2e' ? 1
+                        : this.phases[this.#phaseCalIndex],
                     useMte: this.#mteAddr != null,
-                    wait: ! argv.yes,
+                    wait: ! this.#options.autoAnswer,
                 }));
             }, DELAY_BEFORE_CAL);
             return;
@@ -260,7 +275,7 @@ class Ctrl {
              * has been powered cycle, hence we need to run IMS:CAL:Continue
              * command to resume the calibration process inside the meter
              */
-            if (this.#phaseType == '1p2e' && this.#phaseCalIndex == 1) {
+            if (this.#options.phaseType == '1p2e' && this.#phaseCalIndex == 1) {
                 await this.prompt(
                     'Switch power supply to element 2 and press enter.');
                 this.#startOperation(new SetupLoad(this, this.#loadDef,
@@ -269,10 +284,10 @@ class Ctrl {
                 setTimeout(() => {
                     this.#startOperation(new PhaseCal(this, {
                         phase: this.phases[this.#phaseCalIndex],
-                        readPhase: this.#phaseType == '1p2e'
+                        readPhase: this.#options.phaseType == '1p2e'
                             ? 1 : this.phases[this.#phaseCalIndex],
                         useMte: this.#mteAddr != null,
-                        wait: ! argv.yes,
+                        wait: ! this.#options.autoAnswer,
                     }));
                 }, DELAY_BEFORE_CAL);
             }
@@ -292,7 +307,7 @@ class Ctrl {
         if (value.name == 'cal-cont') {
             this.#startOperation(new PhaseCal(this, {
                 phase: this.phases[this.#phaseCalIndex],
-                readPhase: this.#phaseType == '1p2e'
+                readPhase: this.#options.phaseType == '1p2e'
                     ? 1 : this.phases[this.#phaseCalIndex],
                 useMte: this.#mteAddr != null,
                 wait: false,
@@ -313,18 +328,22 @@ class Ctrl {
 
         if (value.name == 'warm-restart') {
             console.log('Wait meter connected again');
-            this.#startOperation(new ConnMeter(this, 'conn-2', ! argv.ping));
+            this.#startOperation(new ConnMeter(this, 'conn-2',
+                ! this.#options.ping));
             return;
         }
 
         if (value.name == 'conn-2') {
-            if (this.#loadDef) {
+            if (this.#options.phaseType != '1p2e') {
                 console.log('Setup load for accuracy test');
                 this.#startOperation(new SetupLoad(this,
-                    this.#phaseType == '3p' ? loadDefForAccuracyTest3p
+                    this.#options.phaseType == '3p' ? loadDefForAccuracyTest3p
                         : loadDefForAccuracyTest1p,
                     { name: 'setup-load-3' }));
             } else {
+                console.log('For 1p2e meter, please do the accuracy'
+                        + ' check by running this tool with'
+                        + ' no-cali option');
                 console.log('Calibration completed');
                 process.exit(0);
             }
@@ -432,7 +451,12 @@ if (argv.load) {
     loadDef.f = argv.freq;
 }
 
-const ctrl = new Ctrl(argv.phaseType, mteAddr, loadDef);
+const ctrl = new Ctrl({
+    phaseType: argv.phaseType,
+    ping: argv.ping,
+    autoAnswer: argv.yes,
+    noCali: argv.noCali,
+}, mteAddr, loadDef);
 ctrl.timerCoef = argv.timerCoef;
 
 var firstOpr;
